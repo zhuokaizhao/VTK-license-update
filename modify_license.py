@@ -1,4 +1,5 @@
 import os
+import io
 import sys
 import codecs
 import functools
@@ -6,6 +7,16 @@ import argparse
 import fileinput
 import numpy as np
 from time import sleep
+
+def inplace(orig_path, encoding='utf-8', error='ignore'):
+    new_path = orig_path + '.modified'
+    with codecs.open(orig_path, encoding=encoding, errors=error) as orig, \
+        codecs.open(new_path, 'w', encoding=encoding, errors=error) as new:
+
+        for line in orig:
+            yield line, new
+
+    os.rename(new_path, orig_path)
 
 def get_file_paths(root_dir, verbose):
     all_paths = []
@@ -40,14 +51,14 @@ def analyze_file(file_path, all_start_signs, all_stop_signs, all_possible_holder
     start_sign = None
     stop_sign = None
     result = []
-
-    for cur_line in fileinput.input(file_path, inplace=1):
+    # for cur_line in fileinput.input(file_path, inplace=1):
+    for cur_line, new_file in inplace(file_path):
         for i in range(len(all_start_signs)):
             if (start == 0) and (all_start_signs[i] in cur_line):
                 start = 1
                 start_sign = cur_line
                 stop_sign = None
-                sys.stdout.write('')
+                new_file.write('')
                 break
             elif (start == 1) and (all_stop_signs[i] in cur_line):
                 start = 0
@@ -61,13 +72,13 @@ def analyze_file(file_path, all_start_signs, all_stop_signs, all_possible_holder
             for i in range(len(all_possible_holders)):
                 if all_possible_holders[i] in cur_line.lower():
                     result.append((start_sign, all_possible_holders[i], stop_sign))
-            sys.stdout.write('')
+            new_file.write('')
         else:
             if just_change:
-                sys.stdout.write('')
+                new_file.write('')
                 just_change = 0
             else:
-                sys.stdout.write(cur_line)
+                new_file.write(cur_line)
 
     if not result:
         result.append('No license information found')
@@ -81,23 +92,22 @@ def modify_file(file_path, license_info):
         print('Warning:', file_path, 'does not have a valid license info detected.')
         return
 
-    # start = 0
     modified = 0
-    license_num = None
-    for cur_line in fileinput.input(file_path, inplace=1):
+    # for cur_line in fileinput.input(file_path, inplace=1):
+    for cur_line, new_file in inplace(file_path):
         if not modified:
             for i in range(len(license_info)):
-                sys.stdout.write(license_info[i][0])
+                new_file.write(license_info[i][0])
                 if '//====' in license_info[i][0]:
-                    sys.stdout.write('// Plese check ' + license_info[i][1] + '_license.txt for license information.\n')
-                    sys.stdout.write(license_info[i][0])
+                    new_file.write('// Plese check ' + license_info[i][1] + '_license.txt for license information.\n')
+                    new_file.write(license_info[i][0])
                 else:
-                    sys.stdout.write('Plese check ' + license_info[i][1] + '_license.txt for license information.')
-                    sys.stdout.write(license_info[i][0][::-1] + '\n')
+                    new_file.write('Plese check ' + license_info[i][1] + '_license.txt for license information.')
+                    new_file.write(license_info[i][0][::-1] + '\n')
 
             modified = 1
 
-        sys.stdout.write(cur_line)
+        new_file.write(cur_line)
 
 def main(args):
     verbose = int(args.verbose)
@@ -119,7 +129,6 @@ def main(args):
 
     all_possible_holders = ['kitware', 'sandia']
     for cur_path in all_file_paths:
-        # print(cur_path)
         license_result = analyze_file(cur_path, all_start_signs, all_stop_signs, all_possible_holders)
         all_licenses_results.append(license_result)
 
