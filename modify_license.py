@@ -48,11 +48,20 @@ def analyze_file(file_path, all_start_signs, all_stop_signs, all_possible_holder
 
     start = 0
     just_change = 0
+    finished = 0
     start_sign = None
     stop_sign = None
     result = []
     # for cur_line in fileinput.input(file_path, inplace=1):
     for cur_line, new_file in inplace(file_path):
+        # when we see include starts, license stuff is done
+        if '#include' in cur_line:
+            finished = 1
+
+        if finished:
+            new_file.write(cur_line)
+            continue
+
         for i in range(len(all_start_signs)):
             if (start == 0) and (all_start_signs[i] in cur_line):
                 start = 1
