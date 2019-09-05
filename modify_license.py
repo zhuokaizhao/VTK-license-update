@@ -22,12 +22,17 @@ def get_file_paths(root_dir, verbose):
     all_paths = []
     additional_paths = []
     for path in os.scandir(root_dir):
-        # skip third party folder
-        if path.name == 'ThirdParty':
-            print(path.name + ' has been skipped.')
+        # # skip these directories
+        full_path = root_dir + os.sep + path.name
+
+        if 'Utilities/MetaIO' in full_path \
+            or 'Utilities/KWSys' in full_path \
+            or 'Utilities/KWIML' in full_path \
+            or 'ThirdParty/' in full_path:
+
+            print(path.name + ' directory has been skipped.')
             continue
 
-        full_path = root_dir + os.sep + path.name
         if path.is_file():
             if path.name.endswith('.cxx') or path.name.endswith('.h') or path.name.endswith('.cpp'):
                 if verbose == 1:
@@ -102,18 +107,22 @@ def modify_file(file_path, license_info):
         return
 
     modified = 0
+    start = '/*===========================================================================*/\n'
+    start += '/* Distributed under OSI-approved BSD 3-Clause License.                      */\n'
+    start += '/* For copyright, see the following accompanying files or https://vtk.org:   */\n'
+
+    end = '/*===========================================================================*/\n'
     # for cur_line in fileinput.input(file_path, inplace=1):
     for cur_line, new_file in inplace(file_path):
         if not modified:
+            new_file.write(start)
             for i in range(len(license_info)):
-                new_file.write(license_info[i][0])
-                if '//====' in license_info[i][0]:
-                    new_file.write('// Plese check ' + license_info[i][1] + '_license.txt for license information.\n')
-                    new_file.write(license_info[i][0])
-                else:
-                    new_file.write('Plese check ' + license_info[i][1] + '_license.txt for license information.')
-                    new_file.write(license_info[i][0][::-1] + '\n')
+                if license_info[i][1] == 'kitware':
+                    new_file.write('/* - VTK-Copyright.txt                                                       */\n')
+                if license_info[i][1] == 'sandia':
+                    new_file.write('/* - Sandia-Copyright.txt                                                    */\n')
 
+            new_file.write(end)
             modified = 1
 
         new_file.write(cur_line)
