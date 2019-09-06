@@ -2,11 +2,10 @@ import os
 import io
 import sys
 import codecs
-import functools
 import argparse
-import fileinput
 import numpy as np
 from time import sleep
+
 
 def inplace(orig_path, encoding='utf-8', error='ignore'):
     new_path = orig_path + '.modified'
@@ -17,6 +16,7 @@ def inplace(orig_path, encoding='utf-8', error='ignore'):
             yield line, new
 
     os.rename(new_path, orig_path)
+
 
 def get_file_paths(root_dir, verbose):
     all_paths = []
@@ -43,6 +43,7 @@ def get_file_paths(root_dir, verbose):
 
     return all_paths + additional_paths
 
+
 def analyze_file(file_path, all_start_signs, all_stop_signs, all_possible_holders):
     # check if file is empty
     if os.stat(file_path).st_size == 0:
@@ -57,6 +58,11 @@ def analyze_file(file_path, all_start_signs, all_stop_signs, all_possible_holder
     start_sign = None
     stop_sign = None
     result = []
+    is_vtkm = 0
+    # vtkm has a different kitware license than vtk
+    if 'vtkm' in file_path.lower():
+        is_vtkm = 1
+
     # for cur_line in fileinput.input(file_path, inplace=1):
     for cur_line, new_file in inplace(file_path):
         # when we see include starts, license stuff is done
@@ -85,7 +91,12 @@ def analyze_file(file_path, all_start_signs, all_stop_signs, all_possible_holder
             # check which organization is responsible for the license
             for i in range(len(all_possible_holders)):
                 if all_possible_holders[i] in cur_line.lower():
-                    result.append((start_sign, all_possible_holders[i], stop_sign))
+                    holder = all_possible_holders[i]
+                    if is_vtkm and (holder == 'kitware'):
+                        holder += '_vtkm'
+                        result.append((start_sign, holder, stop_sign))
+                    else:
+                        result.append((start_sign, holder, stop_sign))
             new_file.write('')
         else:
             if just_change:
@@ -119,8 +130,12 @@ def modify_file(file_path, license_info):
             for i in range(len(license_info)):
                 if license_info[i][1] == 'kitware':
                     new_file.write('/* - VTK-Copyright.txt                                                       */\n')
+                if license_info[i][1] == 'kitware_vtkm':
+                    new_file.write('/* - VTKm-Copyright.txt                                                      */\n')
                 if license_info[i][1] == 'sandia':
                     new_file.write('/* - Sandia-Copyright.txt                                                    */\n')
+                if license_info[i][1] == 'pvlanl':
+                    new_file.write('/* - PVLANL-Copyright.txt                                                    */\n')
 
             new_file.write(end)
             modified = 1
@@ -145,7 +160,7 @@ def main(args):
     if (len(all_start_signs) != len(all_stop_signs)):
         print('Error: start and stop signs need to be the same sized')
 
-    all_possible_holders = ['kitware', 'sandia']
+    all_possible_holders = ['kitware', 'sandia', 'pvlanl']
     for cur_path in all_file_paths:
         license_result = analyze_file(cur_path, all_start_signs, all_stop_signs, all_possible_holders)
         all_licenses_results.append(license_result)
